@@ -22,7 +22,6 @@ sqlite_url = f"sqlite+{TURSO_DATABASE_URL}/?authToken={TURSO_AUTH_TOKEN}&secure=
 def check_db() -> dict[str, str]:
     try:
         with Session(engine) as session:
-            # text() でラップする
             result = session.execute(text("SELECT 1")).fetchone()
             if result is None:
                 raise HTTPException(status_code=500, detail="No response from DB")
