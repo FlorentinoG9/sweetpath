@@ -15,7 +15,7 @@ export default async function Page() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">
+      <div className="mx-auto flex w-full flex-col gap-8 px-6 py-10">
         <header className="space-y-3 text-center lg:text-left">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
             Sweetpath
