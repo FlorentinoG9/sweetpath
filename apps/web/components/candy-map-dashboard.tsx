@@ -210,7 +210,7 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
     }
 
     return (
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)] lg:items-stretch">
+        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)] lg:items-stretch">
             <div className="lg:h-[calc(100vh-6rem)] lg:min-h-0">
                 <CandyMap
                     houses={sortedHouses}
@@ -222,7 +222,7 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
             </div>
 
             <div className="flex w-full flex-col gap-6 lg:h-[calc(100vh-6rem)] lg:overflow-y-auto">
-                <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <div className="border border-border bg-card p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <div>
                             <h2 className="text-lg font-semibold tracking-tight">
