@@ -1,31 +1,61 @@
 """FastAPI application entrypoint."""
 
+from contextlib import asynccontextmanager
+from typing import Protocol, TypedDict, cast
+
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-import libsql
+import libsql  # type: ignore[import]
 
-from . import crud, models, schemas
-from .config import settings
-from .database import Base, engine, get_db
-from .dependencies import get_geocoder
-from .services.geocoding import AddressNotFoundError, GeocodingError, Geocoder
+from app import crud, schemas
+from app.config import settings
+from app.database import Base, engine, get_db
+from app.dependencies import get_geocoder
+from app.services.geocoding import AddressNotFoundError, GeocodingError, Geocoder
 
-app = FastAPI(title="Sweetpath Candy Map API", version="0.1.0")
+class LocationRecord(TypedDict):
+    id: int
+    latitude: float
+    longitude: float
+    vote: int
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Sweetpath Candy Map API", version="0.1.0", lifespan=lifespan)
+
+class TursoCursor(Protocol):
+    def fetchall(self) -> list[tuple[int, float, float, int]]: ...
+
+
+class TursoConnection(Protocol):
+    def execute(self, query: str) -> TursoCursor: ...
+
 
 TURSO_DATABASE_URL = "libsql://my-geo-db-loaa.aws-us-east-1.turso.io" 
 TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1NzI1MzgsImlkIjoiODBjMGM4MzQtZmE5Yi00M2VjLWI1ZGEtMTYyOTA5YWNiNTY0IiwicmlkIjoiNjYzYzMwNDItYWM1YS00YTMyLWEwMTYtNGY1ODFhZDJiZjlhIn0.LfR5pESawtXzioTLIGzgRuHb2Dvpzg5czMJraA4JQTuIBzZV_hXbAeA_ZeAyDKGilHwGz281RJf3rCUITDo5AA" 
 
-conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+conn = cast(
+    TursoConnection,
+    libsql.connect(  # type: ignore[attr-defined]
+        TURSO_DATABASE_URL,
+        auth_token=TURSO_AUTH_TOKEN,
+    ),
+)
 
 @app.get("/locations", tags=["locations"])
-def get_locations():
+def get_locations() -> list[LocationRecord]:
     try:
         result = conn.execute("SELECT id, latitude, longitude, vote FROM location")
         rows = result.fetchall()
         if not rows:
             raise HTTPException(status_code=404, detail="No locations found")
-        return [
+        locations: list[LocationRecord] = [
             {
                 "id": r[0],
                 "latitude": r[1],
@@ -34,6 +64,7 @@ def get_locations():
             }
             for r in rows
         ]
+        return locations
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB query failed: {str(e)}")
 
@@ -45,13 +76,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    """Apply database schema on startup."""
-    Base.metadata.create_all(bind=engine)
-
 
 @app.get("/health", tags=["health"])
 def health_check() -> dict[str, str]:
