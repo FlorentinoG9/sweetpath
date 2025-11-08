@@ -8,10 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import libsql  # type: ignore[import]
 
-from app import crud, schemas
-from app.config import settings
-from app.database import Base, engine, get_db
-from app.dependencies import get_geocoder
+from . import crud, schemas
+from .config import settings
+from .database import Base, engine, get_db
+from .dependencies import get_geocoder
 from app.services.geocoding import AddressNotFoundError, GeocodingError, Geocoder
 
 class LocationRecord(TypedDict):
@@ -37,14 +37,27 @@ class TursoConnection(Protocol):
     def execute(self, query: str) -> TursoCursor: ...
 
 
-TURSO_DATABASE_URL = "libsql://my-geo-db-loaa.aws-us-east-1.turso.io" 
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1NzI1MzgsImlkIjoiODBjMGM4MzQtZmE5Yi00M2VjLWI1ZGEtMTYyOTA5YWNiNTY0IiwicmlkIjoiNjYzYzMwNDItYWM1YS00YTMyLWEwMTYtNGY1ODFhZDJiZjlhIn0.LfR5pESawtXzioTLIGzgRuHb2Dvpzg5czMJraA4JQTuIBzZV_hXbAeA_ZeAyDKGilHwGz281RJf3rCUITDo5AA" 
+database_url = settings.database_url
+database_auth_token = settings.database_auth_token
+
+if not database_url:
+    raise RuntimeError(
+        "Database configuration missing. Set `CANDY_MAP_DATABASE_URL` in your environment."
+    )
+
+libsql_kwargs: dict[str, str] = {}
+if database_url.startswith("libsql://"):
+    if not database_auth_token:
+        raise RuntimeError(
+            "Turso auth token missing. Set `CANDY_MAP_DATABASE_AUTH_TOKEN` in your environment."
+        )
+    libsql_kwargs["auth_token"] = database_auth_token
 
 conn = cast(
     TursoConnection,
     libsql.connect(  # type: ignore[attr-defined]
-        TURSO_DATABASE_URL,
-        auth_token=TURSO_AUTH_TOKEN,
+        database_url,
+        **libsql_kwargs,
     ),
 )
 

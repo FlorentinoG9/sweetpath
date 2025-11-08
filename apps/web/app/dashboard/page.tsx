@@ -1,6 +1,5 @@
 import { CandyMapDashboard } from "@/components/candy-map-dashboard"
-import type { House } from "@/lib/api"
-import { fetchHouses } from "@/lib/api"
+import { fetchHouses, type House } from "@/lib/api"
 
 export default async function Page() {
   let houses: House[] = []
