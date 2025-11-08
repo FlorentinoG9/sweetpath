@@ -319,7 +319,7 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
                             <p className="text-xs text-muted-foreground">
                                 Drag the selected map pin or enter coordinates manually to place the marker before saving.
                             </p>
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div className="mt-3 flex flex-col gap-3">
                                 <CoordinateInput
                                     label="Latitude"
                                     value={formState.latitude}
