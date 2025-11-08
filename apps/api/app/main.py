@@ -3,7 +3,7 @@
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, text
+import libsql
 
 from . import crud, models, schemas
 from .config import settings
@@ -16,18 +16,26 @@ app = FastAPI(title="Sweetpath Candy Map API", version="0.1.0")
 TURSO_DATABASE_URL = "libsql://my-geo-db-loaa.aws-us-east-1.turso.io" 
 TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1NzI1MzgsImlkIjoiODBjMGM4MzQtZmE5Yi00M2VjLWI1ZGEtMTYyOTA5YWNiNTY0IiwicmlkIjoiNjYzYzMwNDItYWM1YS00YTMyLWEwMTYtNGY1ODFhZDJiZjlhIn0.LfR5pESawtXzioTLIGzgRuHb2Dvpzg5czMJraA4JQTuIBzZV_hXbAeA_ZeAyDKGilHwGz281RJf3rCUITDo5AA" 
 
-sqlite_url = f"sqlite+{TURSO_DATABASE_URL}/?authToken={TURSO_AUTH_TOKEN}&secure=true"
+conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
 
-@app.get("/db_check", tags=["health"])
-def check_db() -> dict[str, str]:
+@app.get("/locations", tags=["locations"])
+def get_locations():
     try:
-        with Session(engine) as session:
-            result = session.execute(text("SELECT 1")).fetchone()
-            if result is None:
-                raise HTTPException(status_code=500, detail="No response from DB")
+        result = conn.execute("SELECT id, latitude, longitude, vote FROM location")
+        rows = result.fetchall()
+        if not rows:
+            raise HTTPException(status_code=404, detail="No locations found")
+        return [
+            {
+                "id": r[0],
+                "latitude": r[1],
+                "longitude": r[2],
+                "vote": r[3]
+            }
+            for r in rows
+        ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DB connection failed: {str(e)}")
-    return {"status": "Database connection successful"}
+        raise HTTPException(status_code=500, detail=f"DB query failed: {str(e)}")
 
 
 app.add_middleware(
