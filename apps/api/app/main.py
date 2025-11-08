@@ -3,6 +3,7 @@
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, text
 
 from . import crud, models, schemas
 from .config import settings
@@ -10,8 +11,25 @@ from .database import Base, engine, get_db
 from .dependencies import get_geocoder
 from .services.geocoding import AddressNotFoundError, GeocodingError, Geocoder
 
-
 app = FastAPI(title="Sweetpath Candy Map API", version="0.1.0")
+
+TURSO_DATABASE_URL = "libsql://my-geo-db-loaa.aws-us-east-1.turso.io" 
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1NzI1MzgsImlkIjoiODBjMGM4MzQtZmE5Yi00M2VjLWI1ZGEtMTYyOTA5YWNiNTY0IiwicmlkIjoiNjYzYzMwNDItYWM1YS00YTMyLWEwMTYtNGY1ODFhZDJiZjlhIn0.LfR5pESawtXzioTLIGzgRuHb2Dvpzg5czMJraA4JQTuIBzZV_hXbAeA_ZeAyDKGilHwGz281RJf3rCUITDo5AA" 
+
+sqlite_url = f"sqlite+{TURSO_DATABASE_URL}/?authToken={TURSO_AUTH_TOKEN}&secure=true"
+
+@app.get("/db_check", tags=["health"])
+def check_db() -> dict[str, str]:
+    try:
+        with Session(engine) as session:
+            # text() でラップする
+            result = session.execute(text("SELECT 1")).fetchone()
+            if result is None:
+                raise HTTPException(status_code=500, detail="No response from DB")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB connection failed: {str(e)}")
+    return {"status": "Database connection successful"}
+
 
 app.add_middleware(
     CORSMiddleware,
