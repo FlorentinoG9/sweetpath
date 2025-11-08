@@ -2,6 +2,7 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@workspace/ui/components/sidebar"
+import { Suspense } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CandyDashboardProvider } from "@/components/candy-dashboard-provider"
 import { SiteHeader } from "@/components/site-header"
@@ -25,16 +26,26 @@ export default async function Layout({ children }: { children: React.ReactNode }
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
-        <CandyDashboardProvider initialHouses={houses} initialError={errorMessage}>
-          <SiteHeader />
-          <div className="flex flex-1">
-            <AppSidebar />
-            <SidebarInset>
-              {children}
-            </SidebarInset>
-          </div>
-        </CandyDashboardProvider>
+        <SiteHeader />
+        <Suspense fallback={<DashboardSuspenseFallback />}>
+          <CandyDashboardProvider initialHouses={houses} initialError={errorMessage}>
+            <div className="flex flex-1">
+              <AppSidebar />
+              <SidebarInset>
+                {children}
+              </SidebarInset>
+            </div>
+          </CandyDashboardProvider>
+        </Suspense>
       </SidebarProvider>
+    </div>
+  )
+}
+
+function DashboardSuspenseFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <p className="text-sm text-muted-foreground">Loading dashboard...</p>
     </div>
   )
 }

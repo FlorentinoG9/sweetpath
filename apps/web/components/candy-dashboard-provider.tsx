@@ -3,12 +3,12 @@
 import { parseAsInteger, useQueryState } from "nuqs"
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from "react"
 import type { BannerState } from "@/components/create-house-form"
 import type { House, HousePayload } from "@/lib/api"
@@ -133,21 +133,25 @@ export function CandyDashboardProvider({
     [setHouseParam],
   )
 
-  const handleFieldChange =
+  const handleFieldChange = useCallback(
     (field: keyof HousePayload) => (value: string | boolean | number) => {
       setFormState((previous) => ({
         ...previous,
         [field]: value,
       }))
-    }
+    },
+    [],
+  )
 
-  const handleCoordinateInputChange =
+  const handleCoordinateInputChange = useCallback(
     (field: "latitude" | "longitude") => (value: string) => {
       setFormState((previous) => ({
         ...previous,
         [field]: value.trim().length === 0 ? null : Number.parseFloat(value),
       }))
-    }
+    },
+    [],
+  )
 
   const handleCoordinateChange = useCallback(
     (houseId: number, latitude: number, longitude: number) => {
@@ -166,10 +170,10 @@ export function CandyDashboardProvider({
         previous.map((house) =>
           house.id === houseId
             ? {
-                ...house,
-                latitude,
-                longitude,
-              }
+              ...house,
+              latitude,
+              longitude,
+            }
             : house,
         ),
       )
