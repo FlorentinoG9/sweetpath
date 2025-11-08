@@ -1,11 +1,17 @@
 "use client";
 
-import maplibregl, { type LngLatBoundsLike, type Map } from "maplibre-gl";
+import type {
+    LngLatBoundsLike,
+    Map as MaplibreMap,
+    Marker as MaplibreMarker,
+} from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import { useEffect, useRef } from "react";
 
 import type { House } from "@/lib/api";
 import "maplibre-gl/dist/maplibre-gl.css";
+
+type MaplibreModule = typeof import("maplibre-gl");
 
 interface CandyMapProps {
     houses: House[];
@@ -15,7 +21,7 @@ interface CandyMapProps {
 }
 
 type MarkerEntry = {
-    marker: maplibregl.Marker;
+    marker: MaplibreMarker;
     teardown: () => void;
 };
 
@@ -24,14 +30,27 @@ const DEFAULT_CENTER: [number, number] = [-98.5795, 39.8283];
 let pmtilesProtocol: Protocol | null = null;
 let pmtilesRegistered = false;
 
-function registerPmtilesProtocol() {
+const mapModuleRef: { current: MaplibreModule | null } = {
+    current: null,
+};
+
+async function loadMaplibre(): Promise<MaplibreModule> {
+    if (mapModuleRef.current) {
+        return mapModuleRef.current;
+    }
+    const module = await import("maplibre-gl");
+    mapModuleRef.current = module;
+    return module;
+}
+
+function registerPmtiles(module: MaplibreModule) {
     if (typeof window === "undefined" || pmtilesRegistered) {
         return;
     }
     if (!pmtilesProtocol) {
         pmtilesProtocol = new Protocol();
     }
-    maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile.bind(pmtilesProtocol));
+    module.addProtocol("pmtiles", pmtilesProtocol.tile.bind(pmtilesProtocol));
     pmtilesRegistered = true;
 }
 
@@ -42,34 +61,52 @@ export function CandyMap({
     styleUrl,
 }: CandyMapProps) {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
-    const mapRef = useRef<Map | null>(null);
+    const mapRef = useRef<MaplibreMap | null>(null);
     const markersRef = useRef<Map<number, MarkerEntry>>(new Map());
     const hasFittedBoundsRef = useRef(false);
     const previousCountRef = useRef(0);
 
     useEffect(() => {
-        registerPmtilesProtocol();
-    }, []);
+        let cancelled = false;
 
-    useEffect(() => {
-        if (!mapContainerRef.current || mapRef.current) {
-            return;
+        async function ensureMap() {
+            const maplibre = await loadMaplibre();
+            if (cancelled) {
+                return;
+            }
+            registerPmtiles(maplibre);
+
+            if (!mapContainerRef.current) {
+                return;
+            }
+
+            if (mapRef.current) {
+                mapRef.current.setStyle(styleUrl);
+                return;
+            }
+
+            const map = new maplibre.Map({
+                container: mapContainerRef.current,
+                style: styleUrl,
+                center: DEFAULT_CENTER,
+                zoom: 4,
+                attributionControl: false,
+            });
+
+            map.addControl(new maplibre.NavigationControl(), "top-left");
+            map.addControl(new maplibre.AttributionControl({ compact: true }), "bottom-left");
+
+            mapRef.current = map;
         }
 
-        const map = new maplibregl.Map({
-            container: mapContainerRef.current,
-            style: styleUrl,
-            center: DEFAULT_CENTER,
-            zoom: 4,
-            attributionControl: false,
-        });
-
-        map.addControl(new maplibregl.NavigationControl(), "top-left");
-        map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
-
-        mapRef.current = map;
+        void ensureMap();
 
         return () => {
+            cancelled = true;
+            const map = mapRef.current;
+            if (!map) {
+                return;
+            }
             markersRef.current.forEach(({ marker, teardown }) => {
                 teardown();
                 marker.remove();
@@ -83,7 +120,8 @@ export function CandyMap({
 
     useEffect(() => {
         const map = mapRef.current;
-        if (!map) {
+        const maplibre = mapModuleRef.current;
+        if (!map || !maplibre) {
             return;
         }
 
@@ -100,7 +138,7 @@ export function CandyMap({
             const existing = markersRef.current.get(house.id);
             if (!existing) {
                 const { element, teardown } = createMarkerElement(house, onSelectHouse);
-                const marker = new maplibregl.Marker({ element })
+                const marker = new maplibre.Marker({ element })
                     .setLngLat([house.longitude, house.latitude])
                     .addTo(map);
                 markersRef.current.set(house.id, { marker, teardown });
@@ -129,7 +167,7 @@ export function CandyMap({
             const bounds = houses.reduce<maplibregl.LngLatBounds | null>((acc, house) => {
                 const coord: [number, number] = [house.longitude, house.latitude];
                 if (!acc) {
-                    return new maplibregl.LngLatBounds(coord, coord);
+                    return new maplibre.LngLatBounds(coord, coord);
                 }
                 return acc.extend(coord);
             }, null);
@@ -196,7 +234,7 @@ function createMarkerElement(house: House, onSelectHouse: (houseId: number) => v
         }
         if (event.key === "Escape") {
             event.preventDefault();
-            onSelectHouse(null);
+            onSelectHouse(null as unknown as number);
         }
     };
 

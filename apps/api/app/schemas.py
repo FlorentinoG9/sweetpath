@@ -1,6 +1,6 @@
 """Pydantic schemas for API validation."""
 
-from datetime import time
+from datetime import datetime, time
 from typing import Optional
 
 from pydantic import BaseModel, Field, constr
@@ -49,8 +49,8 @@ class HouseRead(HouseBase):
     id: int
     latitude: float
     longitude: float
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -65,12 +65,14 @@ async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
 
+  const parsedResponse = response.clone();
+
   if (!response.ok) {
     let payload: unknown;
     try {
-      payload = await response.json();
+      payload = await parsedResponse.json();
     } catch {
-      payload = await response.text();
+      payload = await parsedResponse.text();
     }
     throw new ApiError(
       (payload as { detail?: string })?.detail ?? "Request failed.",
@@ -82,7 +84,8 @@ async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
   }
-  return response.json() as Promise<T>;
+
+  return parsedResponse.json() as Promise<T>;
 }
 
 export async function fetchHouses(includeInactive = true): Promise<House[]> {
