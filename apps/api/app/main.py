@@ -1,31 +1,74 @@
 """FastAPI application entrypoint."""
 
+from contextlib import asynccontextmanager
+from typing import Protocol, TypedDict, cast
+
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-import libsql
+import libsql  # type: ignore[import]
 
-from . import crud, models, schemas
+from . import crud, schemas
 from .config import settings
 from .database import Base, engine, get_db
 from .dependencies import get_geocoder
-from .services.geocoding import AddressNotFoundError, GeocodingError, Geocoder
+from app.services.geocoding import AddressNotFoundError, GeocodingError, Geocoder
 
-app = FastAPI(title="Sweetpath Candy Map API", version="0.1.0")
+class LocationRecord(TypedDict):
+    id: int
+    latitude: float
+    longitude: float
+    vote: int
 
-TURSO_DATABASE_URL = "libsql://my-geo-db-loaa.aws-us-east-1.turso.io" 
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1NzI1MzgsImlkIjoiODBjMGM4MzQtZmE5Yi00M2VjLWI1ZGEtMTYyOTA5YWNiNTY0IiwicmlkIjoiNjYzYzMwNDItYWM1YS00YTMyLWEwMTYtNGY1ODFhZDJiZjlhIn0.LfR5pESawtXzioTLIGzgRuHb2Dvpzg5czMJraA4JQTuIBzZV_hXbAeA_ZeAyDKGilHwGz281RJf3rCUITDo5AA" 
 
-conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Sweetpath Candy Map API", version="0.1.0", lifespan=lifespan)
+
+class TursoCursor(Protocol):
+    def fetchall(self) -> list[tuple[int, float, float, int]]: ...
+
+
+class TursoConnection(Protocol):
+    def execute(self, query: str) -> TursoCursor: ...
+
+
+database_url = settings.database_url
+database_auth_token = settings.database_auth_token
+
+if not database_url:
+    raise RuntimeError(
+        "Database configuration missing. Set `CANDY_MAP_DATABASE_URL` in your environment."
+    )
+
+libsql_kwargs: dict[str, str] = {}
+if database_url.startswith("libsql://"):
+    if not database_auth_token:
+        raise RuntimeError(
+            "Turso auth token missing. Set `CANDY_MAP_DATABASE_AUTH_TOKEN` in your environment."
+        )
+    libsql_kwargs["auth_token"] = database_auth_token
+
+conn = cast(
+    TursoConnection,
+    libsql.connect(  # type: ignore[attr-defined]
+        database_url,
+        **libsql_kwargs,
+    ),
+)
 
 @app.get("/locations", tags=["locations"])
-def get_locations():
+def get_locations() -> list[LocationRecord]:
     try:
         result = conn.execute("SELECT id, latitude, longitude, vote FROM location")
         rows = result.fetchall()
         if not rows:
             raise HTTPException(status_code=404, detail="No locations found")
-        return [
+        locations: list[LocationRecord] = [
             {
                 "id": r[0],
                 "latitude": r[1],
@@ -34,6 +77,7 @@ def get_locations():
             }
             for r in rows
         ]
+        return locations
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB query failed: {str(e)}")
 
@@ -45,13 +89,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    """Apply database schema on startup."""
-    Base.metadata.create_all(bind=engine)
-
 
 @app.get("/health", tags=["health"])
 def health_check() -> dict[str, str]:

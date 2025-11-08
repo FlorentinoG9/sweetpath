@@ -7,7 +7,7 @@ import type {
     Marker as MaplibreMarker,
 } from "maplibre-gl";
 import { Protocol } from "pmtiles";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { House } from "@/lib/api";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -36,6 +36,48 @@ let pmtilesRegistered = false;
 const mapModuleRef: { current: MaplibreModule | null } = {
     current: null,
 };
+
+function watchMapReady(map: MaplibreMap, onReady: () => void) {
+    if (map.isStyleLoaded()) {
+        onReady();
+        return () => undefined;
+    }
+
+    let isCancelled = false;
+
+    function cleanup() {
+        if (isCancelled) {
+            return;
+        }
+        isCancelled = true;
+        map.off("styledata", handleStyleData);
+        map.off("load", handleLoad);
+    }
+
+    function handleStyleData() {
+        if (isCancelled) {
+            return;
+        }
+        if (!map.isStyleLoaded()) {
+            return;
+        }
+        onReady();
+        cleanup();
+    }
+
+    function handleLoad() {
+        if (isCancelled) {
+            return;
+        }
+        onReady();
+        cleanup();
+    }
+
+    map.once("load", handleLoad);
+    map.on("styledata", handleStyleData);
+
+    return cleanup;
+}
 
 async function loadMaplibre(): Promise<MaplibreModule> {
     if (mapModuleRef.current) {
@@ -70,6 +112,8 @@ export function CandyMap({
     const hasFittedBoundsRef = useRef(false);
     const previousCountRef = useRef(0);
     const resizeObserverRef = useRef<ResizeObserver | null>(null);
+    const styleReadyCleanupRef = useRef<(() => void) | null>(null);
+    const [isMapReady, setIsMapReady] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -86,7 +130,11 @@ export function CandyMap({
             }
 
             if (mapRef.current) {
-                mapRef.current.setStyle(styleUrl);
+                styleReadyCleanupRef.current?.();
+                setIsMapReady(false);
+                const currentMap = mapRef.current;
+                currentMap.setStyle(styleUrl);
+                styleReadyCleanupRef.current = watchMapReady(currentMap, () => setIsMapReady(true));
                 return;
             }
 
@@ -103,6 +151,8 @@ export function CandyMap({
 
             mapRef.current = map;
             map.resize();
+            setIsMapReady(Boolean(map.isStyleLoaded()));
+            styleReadyCleanupRef.current = watchMapReady(map, () => setIsMapReady(true));
         }
 
         void ensureMap();
@@ -125,13 +175,16 @@ export function CandyMap({
             if (resizeObserverRef.current && mapContainerRef.current) {
                 resizeObserverRef.current.unobserve(mapContainerRef.current);
             }
+            styleReadyCleanupRef.current?.();
+            styleReadyCleanupRef.current = null;
+            setIsMapReady(false);
         };
     }, [styleUrl]);
 
     useEffect(() => {
         const map = mapRef.current;
         const maplibre = mapModuleRef.current;
-        if (!map || !maplibre) {
+        if (!map || !maplibre || !isMapReady) {
             return;
         }
 
@@ -214,7 +267,7 @@ export function CandyMap({
             }
         }
         previousCountRef.current = houses.length;
-    }, [houses, onCoordinateChange, onSelectHouse, selectedHouseId]);
+    }, [houses, isMapReady, onCoordinateChange, onSelectHouse, selectedHouseId]);
 
     useEffect(() => {
         if (!selectedHouseId) {

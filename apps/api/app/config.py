@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     database_url: str = "sqlite:///./candy_map.db"
+    database_auth_token: str | None = None
     geocoding_base_url: str = "https://nominatim.openstreetmap.org"
     geocoding_user_agent: str = "sweetpath-candy-map/1.0"
     geocoding_timeout_seconds: float = 10.0
