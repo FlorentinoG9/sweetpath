@@ -36,6 +36,8 @@ const EMPTY_FORM: HousePayload = {
     start_time: "",
     end_time: "",
     is_active: true,
+    latitude: null,
+    longitude: null,
 }
 
 export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
@@ -74,6 +76,8 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
                 start_time: selectedHouse.start_time ?? "",
                 end_time: selectedHouse.end_time ?? "",
                 is_active: selectedHouse.is_active,
+                latitude: selectedHouse.latitude ?? null,
+                longitude: selectedHouse.longitude ?? null,
             })
         } else {
             setFormState({ ...EMPTY_FORM })
@@ -88,12 +92,49 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
         [setHouseParam],
     )
 
-    const handleFieldChange = (field: keyof HousePayload) => (value: string | boolean) => {
+    const handleCoordinateChange = useCallback(
+        (houseId: number, latitude: number, longitude: number) => {
+            setFormState((previous) => {
+                if (houseId !== selectedHouseId) {
+                    return previous
+                }
+                return {
+                    ...previous,
+                    latitude,
+                    longitude,
+                }
+            })
+
+            setHouses((previous) =>
+                previous.map((house) =>
+                    house.id === houseId
+                        ? {
+                            ...house,
+                            latitude,
+                            longitude,
+                        }
+                        : house,
+                ),
+            )
+        },
+        [selectedHouseId],
+    )
+
+    const handleFieldChange = (field: keyof HousePayload) => (value: string | boolean | number) => {
         setFormState((prev) => ({
             ...prev,
             [field]: value,
         }))
     }
+
+    const handleCoordinateInputChange =
+        (field: "latitude" | "longitude") =>
+            (value: string) => {
+                setFormState((previous) => ({
+                    ...previous,
+                    [field]: value.trim().length === 0 ? null : Number.parseFloat(value),
+                }))
+            }
 
     const normalizePayload = (payload: HousePayload): HousePayload => ({
         ...payload,
@@ -169,15 +210,18 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
     }
 
     return (
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[ minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
-            <CandyMap
-                houses={sortedHouses}
-                selectedHouseId={selectedHouseId}
-                onSelectHouse={handleSelectHouse}
-                styleUrl={styleUrl}
-            />
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,4fr)_minmax(0,1fr)] lg:items-stretch">
+            <div className="lg:h-[calc(100vh-6rem)] lg:min-h-0">
+                <CandyMap
+                    houses={sortedHouses}
+                    selectedHouseId={selectedHouseId}
+                    onSelectHouse={handleSelectHouse}
+                    onCoordinateChange={handleCoordinateChange}
+                    styleUrl={styleUrl}
+                />
+            </div>
 
-            <div className="flex w-full flex-col gap-6">
+            <div className="flex w-full flex-col gap-6 lg:h-[calc(100vh-6rem)] lg:overflow-y-auto">
                 <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <div>
@@ -268,6 +312,26 @@ export function CandyMapDashboard({ initialHouses }: CandyMapDashboardProps) {
                                 required
                             />
                         </div>
+                        <fieldset className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Coordinates
+                            </legend>
+                            <p className="text-xs text-muted-foreground">
+                                Drag the selected map pin or enter coordinates manually to place the marker before saving.
+                            </p>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <CoordinateInput
+                                    label="Latitude"
+                                    value={formState.latitude}
+                                    onChange={handleCoordinateInputChange("latitude")}
+                                />
+                                <CoordinateInput
+                                    label="Longitude"
+                                    value={formState.longitude}
+                                    onChange={handleCoordinateInputChange("longitude")}
+                                />
+                            </div>
+                        </fieldset>
                         <TextAreaField
                             label="Treats description"
                             name="treats_description"
@@ -396,6 +460,29 @@ function TextAreaField({ label, name, value, onChange, rows = 3 }: TextAreaField
                 onChange={(event) => onChange(event.target.value)}
                 rows={rows}
                 className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            />
+        </label>
+    )
+}
+
+interface CoordinateInputProps {
+    label: string
+    value: number | null | undefined
+    onChange: (value: string) => void
+}
+
+function CoordinateInput({ label, value, onChange }: CoordinateInputProps) {
+    return (
+        <label className="grid gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <span>{label}</span>
+            <input
+                type="number"
+                inputMode="decimal"
+                step="0.000001"
+                value={value ?? ""}
+                placeholder="Drag pin"
+                onChange={(event) => onChange(event.target.value)}
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm font-mono text-foreground shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
         </label>
     )
