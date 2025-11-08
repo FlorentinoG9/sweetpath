@@ -91,13 +91,6 @@ export function CreateHouseForm({
                     autoComplete="address-line1"
                     required
                 />
-                <InputField
-                    label="Address line 2"
-                    name="address_line2"
-                    value={formState.address_line2 ?? ""}
-                    onChange={onFieldChange("address_line2")}
-                    autoComplete="address-line2"
-                />
                 <div className="grid gap-4 sm:grid-cols-3">
                     <InputField
                         label="City"
