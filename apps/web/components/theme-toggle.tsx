@@ -8,6 +8,12 @@ import { useMetaColor } from "@/hooks/use-meta-color";
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
   const { setMetaColor, metaColor } = useMetaColor();
+  const [mounted, setMounted] = React.useState(false);
+
+  // Prevent hydration mismatch by only rendering after mount
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   React.useEffect(() => {
     setMetaColor(metaColor);
@@ -17,7 +23,8 @@ export function ThemeToggle() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   }, [resolvedTheme, setTheme]);
 
-  const theme = resolvedTheme === "dark" ? "light" : "dark";
+  // Calculate theme - use resolvedTheme when mounted, otherwise default to prevent hydration mismatch
+  const theme = mounted && resolvedTheme === "dark" ? "light" : "dark";
   const title = `Toggle theme to ${theme}`;
 
   return (
@@ -27,6 +34,7 @@ export function ThemeToggle() {
       size="icon"
       title={title}
       variant="ghost"
+      suppressHydrationWarning
     >
       <svg
         aria-hidden="true"
@@ -48,7 +56,7 @@ export function ThemeToggle() {
         <path d="M12 14.3l7.37 -7.37" />
         <path d="M12 19.6l8.85 -8.85" />
       </svg>
-      <span className="sr-only">{title}</span>
+      <span className="sr-only" suppressHydrationWarning>{title}</span>
     </Button>
   );
 }

@@ -1,7 +1,7 @@
 "use client"
 
-import { CandyMap } from "@/components/candy-map"
 import { useCandyDashboard } from "@/components/candy-dashboard-provider"
+import { CandyMap } from "@/components/candy-map"
 import { HouseList } from "@/components/house-list"
 
 export function CandyMapDashboard() {

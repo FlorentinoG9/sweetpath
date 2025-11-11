@@ -21,7 +21,8 @@
 		"pmtiles": "^4.3.0",
 		"protomaps-themes-base": "^4.5.0",
 		"react": "^19.2.0",
-		"react-dom": "^19.2.0"
+		"react-dom": "^19.2.0",
+		"zustand": "^5.0.8"
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.0",
